@@ -37,6 +37,8 @@ struct IndexFlat : IndexFlatCodes {
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
 
+    void assign(idx_t n, const float* x, idx_t* labels, idx_t k) const override;
+
     void range_search(
             idx_t n,
             const float* x,

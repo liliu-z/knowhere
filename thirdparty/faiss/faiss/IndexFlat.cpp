@@ -101,6 +101,25 @@ void IndexFlat::range_search(
             FAISS_THROW_MSG("metric type not supported");
     }
 }
+void IndexFlat::assign(idx_t n, const float* x, idx_t* labels, idx_t k) const {
+    // usually used in IVF k-means algorithm
+    std::vector<float> distances(n * k);
+    switch (metric_type) {
+        case METRIC_INNER_PRODUCT:
+        case METRIC_L2: {
+            // ignore the metric_type, both use L2
+            elkan_L2_sse(x, get_xb(), d, n, ntotal, labels, distances.data());
+            break;
+        }
+        default: {
+            // binary metrics
+            // There may be something wrong, but maintain the original logic
+            // now.
+            Index::assign(n, x, labels, k);
+            break;
+        }
+    }
+}
 
 void IndexFlat::compute_distance_subset(
         idx_t n,

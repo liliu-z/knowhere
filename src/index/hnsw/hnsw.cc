@@ -13,6 +13,7 @@
 
 #include <omp.h>
 
+#include <chrono>
 #include <exception>
 #include <new>
 
@@ -83,16 +84,30 @@ class HnswIndexNode : public IndexNode {
         auto hnsw_cfg = static_cast<const HnswConfig&>(cfg);
         index_->addPoint(tensor, 0);
         auto build_pool = ThreadPool::GetGlobalBuildThreadPool();
-        std::vector<folly::Future<folly::Unit>> futures;
-        futures.reserve(rows);
+	int batch = 1000;
+        int itr = rows / batch;
+        for (int it = 0; it < itr; it++) {
+	    std::vector<folly::Future<folly::Unit>> futures;
+            futures.reserve(batch);
+            int start = it * batch;
+            int end = (it + 1) * batch;
+	    if (start == 0) start = 1;
+            auto s = std::chrono::high_resolution_clock::now();
+	    for (int i = start; i < end; ++i) {
+                futures.emplace_back(build_pool->push(
+                    [&, idx = i]() { 
+		    index_->addPoint(((const char*)tensor + index_->data_size_ * idx), idx); 
+		    }));
+            }
+            for (auto& future : futures) {
+                future.wait();
+            }
+            auto e = std::chrono::high_resolution_clock::now();
+            std::cout << "add " << it
+                      << " batch cost: " << std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count()
+                      << " ms" << std::endl;
+        }
 
-        for (int i = 1; i < rows; ++i) {
-            futures.emplace_back(build_pool->push(
-                [&, idx = i]() { index_->addPoint(((const char*)tensor + index_->data_size_ * idx), idx); }));
-        }
-        for (auto& future : futures) {
-            future.wait();
-        }
         build_time.RecordSection("");
         LOG_KNOWHERE_INFO_ << "HNSW built with #points num:" << index_->max_elements_ << " #M:" << index_->M_
                            << " #max level:" << index_->maxlevel_ << " #ef_construction:" << index_->ef_construction_

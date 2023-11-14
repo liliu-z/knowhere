@@ -142,7 +142,7 @@ class ThreadPool {
             LOG_KNOWHERE_WARNING_ << "Global Build ThreadPool has not been initialized yet, init it with threads num: "
                                   << global_build_thread_pool_size_;
         }
-        static auto pool = std::make_shared<ThreadPool>(global_build_thread_pool_size_, "Knowhere_Build");
+        static auto pool = std::make_shared<ThreadPool>(16, "Knowhere_Build");
         return pool;
     }
 
