@@ -18,7 +18,10 @@ IndexFactory::Create(const std::string& name, const int32_t& version, const Obje
     auto& func_mapping_ = MapInstance();
     assert(func_mapping_.find(name) != func_mapping_.end());
     LOG_KNOWHERE_INFO_ << "create knowhere index " << name << " with version " << version;
-    return func_mapping_[name](version, object);
+    LOG_KNOWHERE_INFO_ << typeid(func_mapping_[name]).name() << "   " << name << "\n";
+    auto tem = func_mapping_[name](version, object);
+    LOG_KNOWHERE_INFO_ << "shenme guidognxi \n";
+    return tem;
 }
 
 const IndexFactory&

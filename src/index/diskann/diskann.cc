@@ -41,9 +41,13 @@ class DiskANNIndexNode : public IndexNode {
 
  public:
     DiskANNIndexNode(const int32_t& version, const Object& object) : is_prepared_(false), dim_(-1), count_(-1) {
+        std::cout << 123 << std::endl;
         assert(typeid(object) == typeid(Pack<std::shared_ptr<FileManager>>));
+        std::cout << 332 << std::endl;
         auto diskann_index_pack = dynamic_cast<const Pack<std::shared_ptr<FileManager>>*>(&object);
+        std::cout << 321 << std::endl;
         assert(diskann_index_pack != nullptr);
+        std::cout << 123 << std::endl;
         file_manager_ = diskann_index_pack->GetPack();
     }
 
