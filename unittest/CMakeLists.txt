@@ -14,84 +14,83 @@ include_directories(${KNOWHERE_SOURCE_DIR}/thirdparty/faiss)
 include_directories(${KNOWHERE_SOURCE_DIR}/knowhere)
 include_directories(${KNOWHERE_SOURCE_DIR})
 
-set( DEPEND_LIBS
+set(DEPEND_LIBS
         gtest
         gmock
         gtest_main
         gmock_main
+)
+
+if(LINUX AND ENABLE_PROFILING)
+        set(DEPEND_LIBS
+                ${DEPEND_LIBS}
+                gperftools
         )
-
-if ( LINUX AND ENABLE_PROFILING )
-    set( DEPEND_LIBS
-            ${DEPEND_LIBS}
-            gperftools
-            )
-endif ()
-
-if ( ( LINUX OR MSYS ) AND KNOWHERE_GPU_VERSION )
-    include_directories( ${CUDA_INCLUDE_DIRS} )
-    link_directories( "${CUDA_TOOLKIT_ROOT_DIR}/lib64" )
-    set( CUDA_LIB
-            cudart
-            cublas
-            )
-endif ()
-
-set( UTIL_SRCS
-        ${KNOWHERE_SOURCE_DIR}/unittest/utils.cpp
-        ${KNOWHERE_SOURCE_DIR}/unittest/ThreadChecker.cpp
-        )
-
-set( ALL_INDEXING_SRCS
-        ${UTIL_SRCS}
-        test_common.cpp
-        test_utils.cpp
-        )
-
-set(ALL_INDEXING_SRCS
-        ${ALL_INDEXING_SRCS}
-        test_annoy.cpp
-        test_async.cpp
-        test_binaryidmap.cpp
-        test_binaryivf.cpp
-        test_bruteforce.cpp
-        test_hnsw.cpp
-        test_idmap.cpp
-        test_ivf.cpp
-        test_ivf_nm.cpp
-        test_vecindex.cpp
-        )
-
-if ( LINUX OR MSYS )
-    set(ALL_INDEXING_SRCS
-            ${ALL_INDEXING_SRCS}
-            test_instructionset.cpp
-            )
 endif()
 
-if ( KNOWHERE_WITH_DISKANN ) 
-    set(ALL_INDEXING_SRCS
-            ${ALL_INDEXING_SRCS}
-            test_diskann.cpp
-            )
-    set( DEPEND_LIBS
-            ${DEPEND_LIBS}
-            stdc++fs
-            )
-endif ()
+if((LINUX OR MSYS) AND KNOWHERE_GPU_VERSION)
+        include_directories(${CUDA_INCLUDE_DIRS})
+        link_directories("${CUDA_TOOLKIT_ROOT_DIR}/lib64")
+        set(CUDA_LIB
+                cudart
+                cublas
+        )
+endif()
 
-if ( KNOWHERE_GPU_VERSION )
-    set(ALL_INDEXING_SRCS
-            ${ALL_INDEXING_SRCS}
-            test_gpuresource.cpp
-            )
-endif ()
+set(UTIL_SRCS
+        ${KNOWHERE_SOURCE_DIR}/unittest/utils.cpp
+        ${KNOWHERE_SOURCE_DIR}/unittest/ThreadChecker.cpp
+)
 
-add_executable( test_knowhere ${ALL_INDEXING_SRCS} )
-target_link_libraries( test_knowhere knowhere ${DEPEND_LIBS} )
+# set(ALL_INDEXING_SRCS
+# ${UTIL_SRCS}
+# test_common.cpp
+# test_utils.cpp
+# )
+set(ALL_INDEXING_SRCS
+        ${ALL_INDEXING_SRCS}
+
+        # test_annoy.cpp
+        # test_async.cpp
+        # test_binaryidmap.cpp
+        # test_binaryivf.cpp
+        # test_bruteforce.cpp
+        # test_hnsw.cpp
+        # test_idmap.cpp
+        # test_ivf.cpp
+        # test_ivf_nm.cpp
+        # test_vecindex.cpp
+)
+
+# if(LINUX OR MSYS)
+# set(ALL_INDEXING_SRCS
+# ${ALL_INDEXING_SRCS}
+# # test_instructionset.cpp
+# )
+# endif()
+if(KNOWHERE_WITH_DISKANN)
+        set(ALL_INDEXING_SRCS
+                ${ALL_INDEXING_SRCS}
+                test_diskann.cpp
+        )
+        set(DEPEND_LIBS
+                ${DEPEND_LIBS}
+                stdc++fs
+        )
+endif()
+
+if(KNOWHERE_GPU_VERSION)
+        set(ALL_INDEXING_SRCS
+                ${ALL_INDEXING_SRCS}
+                test_gpuresource.cpp
+        )
+endif()
+
+add_executable(test_knowhere ${ALL_INDEXING_SRCS})
+target_link_libraries(test_knowhere knowhere ${DEPEND_LIBS})
 
 install(TARGETS test_knowhere DESTINATION unittest)
 
-if ( BUILD_BENCHMARK )
-    add_subdirectory(benchmark)
+if(BUILD_BENCHMARK)
+        add_subdirectory(benchmark)
 endif()

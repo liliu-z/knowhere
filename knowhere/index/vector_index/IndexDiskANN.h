@@ -49,8 +49,8 @@ class IndexDiskANN : public VecIndex {
     }
 
     /**
-     * @brief Due to legacy reasons, Train() and AddWithoutIds() are bonded together. We will put the building work in
-     * AddWIthoutIds() and leave Train() empty for now.
+     * @brief Due to legacy reasons, Train() and AddWithoutIds() are bonded together. We will put the building work
+     * in AddWIthoutIds() and leave Train() empty for now.
      */
     void
     Train(const DatasetPtr& /* unused */, const Config& /* unused */) override{};
@@ -121,6 +121,8 @@ class IndexDiskANN : public VecIndex {
     std::atomic_int64_t dim_ = -1;
     std::atomic_int64_t count_ = -1;
     std::shared_ptr<ThreadPool> pool_;
+
+    int no_;
 };
 
 }  // namespace knowhere

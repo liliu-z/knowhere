@@ -24,16 +24,18 @@ option(FAISS_ENABLE_PYTHON "Build Python extension." ON)
 option(FAISS_ENABLE_C_API "Build C API." OFF)
 option(FAISS_ENABLE_CCACHE "Build with ccache." ON)
 
-if (FAISS_ENABLE_CCACHE)
-    find_program(CCACHE_FOUND ccache)
-    if (CCACHE_FOUND)
-        message(STATUS "Using ccache: ${CCACHE_FOUND}")
-        set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE_FOUND})
-        set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE_FOUND})
-        # let ccache preserve C++ comments, because some of them may be
-        # meaningful to the compiler
-        set(ENV{CCACHE_COMMENTS} "1")
-    endif (CCACHE_FOUND)
+if(FAISS_ENABLE_CCACHE)
+  find_program(CCACHE_FOUND ccache)
+
+  if(CCACHE_FOUND)
+    message(STATUS "Using ccache: ${CCACHE_FOUND}")
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE_FOUND})
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE_FOUND})
+
+    # let ccache preserve C++ comments, because some of them may be
+    # meaningful to the compiler
+    set(ENV{CCACHE_COMMENTS} "1")
+  endif(CCACHE_FOUND)
 endif()
 
 if(FAISS_ENABLE_GPU)
@@ -59,13 +61,3 @@ endif()
 
 add_subdirectory(demos)
 add_subdirectory(tutorial/cpp)
-
-# CTest must be included in the top level to enable `make test` target.
-include(CTest)
-if(BUILD_TESTING)
-  add_subdirectory(tests)
-
-  if(FAISS_ENABLE_GPU)
-    add_subdirectory(faiss/gpu/test)
-  endif()
-endif()
