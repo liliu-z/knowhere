@@ -21,10 +21,12 @@ include(ExternalProject)
 include(cmake/utils/utils.cmake)
 
 knowhere_option(WITH_RAFT "Build with RAFT indexes" OFF)
-if (WITH_RAFT)
-  if("${CMAKE_CUDA_ARCHITECTURES}" STREQUAL "")
-    set(CMAKE_CUDA_ARCHITECTURES RAPIDS)
-  endif()
+
+if(WITH_RAFT)
+  # if("${CMAKE_CUDA_ARCHITECTURES}" STREQUAL "")
+  set(CMAKE_CUDA_ARCHITECTURES "75-real")
+
+  # endif()
   include(cmake/libs/librapids.cmake)
   project(knowhere CXX C CUDA)
   include(cmake/libs/libraft.cmake)
@@ -40,14 +42,14 @@ knowhere_option(WITH_PROFILER "Build with profiler" OFF)
 knowhere_option(WITH_FAISS_TESTS "Build with Faiss unit tests" OFF)
 
 # this is needed for clang on ubuntu:20.04, otherwise
-#   the linked fails with 'undefined reference' error.
+# the linked fails with 'undefined reference' error.
 # fmt v9 was used by the time the error was encountered.
 # clang on ubuntu:22.04 seems to be unaffected.
 # gcc seems to be unaffected.
 add_definitions(-DFMT_HEADER_ONLY)
 
 # this is needed for clang on ubuntu:20.04, otherwise
-#   the linked fails with 'undefined reference' error.
+# the linked fails with 'undefined reference' error.
 # fmt v9 was used by the time the error was encountered.
 # clang on ubuntu:22.04 seems to be unaffected.
 # gcc seems to be unaffected.
@@ -60,17 +62,19 @@ endif()
 
 if(WITH_CCACHE)
   find_program(CCACHE_FOUND ccache)
+
   if(CCACHE_FOUND)
     message(STATUS "Using ccache: ${CCACHE_FOUND}")
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE_FOUND})
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE_FOUND})
+
     # let ccache preserve C++ comments, because some of them may be meaningful
     # to the compiler
     set(ENV{CCACHE_COMMENTS} "1")
   endif()
 endif()
 
-list( APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/)
 
 add_definitions(-DNOT_COMPILE_FOR_SWIG)
 
@@ -86,7 +90,6 @@ find_package(OpenMP REQUIRED)
 find_package(folly REQUIRED)
 include_directories(${folly_INCLUDE_DIRS})
 
-
 find_package(nlohmann_json REQUIRED)
 find_package(glog REQUIRED)
 find_package(prometheus-cpp REQUIRED)
@@ -97,7 +100,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum OS X deployment ve
 if(OPENMP_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   set(CMAKE_EXE_LINKER_FLAGS
-      "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
 if(WITH_COVERAGE)
@@ -105,7 +108,7 @@ if(WITH_COVERAGE)
 endif()
 
 knowhere_file_glob(GLOB_RECURSE KNOWHERE_SRCS src/common/*.cc src/index/*.cc
-                   src/io/*.cc src/common/*.cu src/index/*.cu src/io/*.cu)
+  src/io/*.cc src/common/*.cu src/index/*.cu src/io/*.cu)
 
 set(KNOWHERE_LINKER_LIBS "")
 
@@ -118,13 +121,13 @@ else()
 endif()
 
 knowhere_file_glob(GLOB_RECURSE KNOWHERE_GPU_SRCS src/index/gpu/flat_gpu/*.cc
-                     src/index/gpu/ivf_gpu/*.cc)
+  src/index/gpu/ivf_gpu/*.cc)
 list(REMOVE_ITEM KNOWHERE_SRCS ${KNOWHERE_GPU_SRCS})
 
 if(NOT WITH_RAFT)
   knowhere_file_glob(GLOB_RECURSE KNOWHERE_RAFT_SRCS
-                     src/common/raft/*.cu src/common/raft/*.cc
-                     src/index/gpu_raft/*.cc)
+    src/common/raft/*.cu src/common/raft/*.cc
+    src/index/gpu_raft/*.cc)
   list(REMOVE_ITEM KNOWHERE_SRCS ${KNOWHERE_RAFT_SRCS})
 endif()
 
@@ -140,9 +143,11 @@ list(APPEND KNOWHERE_LINKER_LIBS Folly::folly)
 
 add_library(knowhere SHARED ${KNOWHERE_SRCS})
 add_dependencies(knowhere ${KNOWHERE_LINKER_LIBS})
+
 if(WITH_RAFT)
   list(APPEND KNOWHERE_LINKER_LIBS raft::raft raft::compiled_static CUDA::cublas CUDA::cusparse CUDA::cusolver)
 endif()
+
 target_link_libraries(knowhere PUBLIC ${KNOWHERE_LINKER_LIBS})
 target_include_directories(
   knowhere PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -160,6 +165,6 @@ if(WITH_FAISS_TESTS)
 endif()
 
 install(TARGETS knowhere
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/include/knowhere"
-        DESTINATION "${CMAKE_INSTALL_PREFIX}/include")
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/include")
