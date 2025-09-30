@@ -1266,7 +1266,7 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
                                                      index_wrapper_ptr = index_wrapper_ptr,
                                                      bf_index_wrapper_ptr = bf_index_wrapper_ptr]() {
                     int64_t start_idx = idi * batch_size;
-                    int64_t end_idx = std::min(start_idx + batch_size, rows);
+                    int64_t end_idx = std::min<int64_t>(start_idx + static_cast<int64_t>(batch_size), rows);
                     for (int64_t idx = start_idx; idx < end_idx; ++idx) {
                         // 1 thread per element
                         ThreadPool::ScopedSearchOmpSetter setter(1);
