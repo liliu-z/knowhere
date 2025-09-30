@@ -1248,13 +1248,13 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
         auto distances = std::make_unique<float[]>(rows * k);
 
         try {
-            std::vector<folly::Future<folly::Unit>> futs;
-            futs.reserve(rows);
-
             size_t concurrency =
                 (std::max<size_t>(1, search_pool->size() - 1) / search_pool->get_search_pool_holder()) + 1;
             size_t batch_size = std::max<size_t>(1, rows / concurrency);
             size_t batch_num = (rows + batch_size - 1) / batch_size;
+
+            std::vector<folly::Future<folly::Unit>> futs;
+            futs.reserve(batch_num);
 
             // size_t holder_num = search_pool->get_search_pool_holder();
             // size_t thread_num = search_pool->size();
