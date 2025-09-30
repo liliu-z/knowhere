@@ -136,6 +136,23 @@ class ThreadPool {
         return pool_.numThreads();
     }
 
+    void
+    register_search_pool_holder() {
+        search_pool_holder_.fetch_add(1);
+        LOG_KNOWHERE_ERROR_ << "liliutest now I have " << search_pool_holder_.load() << " search pool holders";
+    }
+
+    void
+    unregister_search_pool_holder() {
+        search_pool_holder_.fetch_sub(1);
+        LOG_KNOWHERE_ERROR_ << "liliutest now I have " << search_pool_holder_.load() << " search pool holders";
+    }
+
+    size_t
+    get_search_pool_holder() {
+        return search_pool_holder_.load();
+    }
+
     size_t
     GetPendingTaskCount() {
         return pool_.getPendingTaskCount();
@@ -315,6 +332,7 @@ class ThreadPool {
     inline static std::shared_ptr<ThreadPool> search_pool_ = nullptr;
 
     constexpr static size_t kTaskQueueFactor = 16;
+    std::atomic<int> search_pool_holder_ = 0;
 };
 
 // T is either folly::Unit or Status

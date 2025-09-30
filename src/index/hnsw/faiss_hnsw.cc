@@ -14,6 +14,7 @@
 #include <faiss/cppcontrib/knowhere/utils/Bitset.h>
 #include <faiss/utils/Heap.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -66,6 +67,7 @@ class BaseFaissIndexNode : public IndexNode {
     BaseFaissIndexNode(const int32_t& /*version*/, const Object& object) {
         build_pool = ThreadPool::GetGlobalBuildThreadPool();
         search_pool = ThreadPool::GetGlobalSearchThreadPool();
+        search_pool->register_search_pool_holder();
     }
 
     bool
@@ -1249,67 +1251,82 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
             std::vector<folly::Future<folly::Unit>> futs;
             futs.reserve(rows);
 
-            for (int64_t i = 0; i < rows; ++i) {
-                futs.emplace_back(search_pool->push([&, idx = i, is_refined = is_refined,
+            size_t concurrency =
+                (std::max<size_t>(1, search_pool->size() - 1) / search_pool->get_search_pool_holder()) + 1;
+            size_t batch_size = std::max<size_t>(1, rows / concurrency);
+            size_t batch_num = (rows + batch_size - 1) / batch_size;
+
+            // size_t holder_num = search_pool->get_search_pool_holder();
+            // size_t thread_num = search_pool->size();
+            // size_t batch_size = std::max(1, rows * holder_num / thread_num);
+            // size_t batch_num = (rows + batch_size - 1) / batch_size);
+
+            for (int64_t i = 0; i < batch_num; ++i) {
+                futs.emplace_back(search_pool->push([&, idi = i, is_refined = is_refined,
                                                      index_wrapper_ptr = index_wrapper_ptr,
                                                      bf_index_wrapper_ptr = bf_index_wrapper_ptr]() {
-                    // 1 thread per element
-                    ThreadPool::ScopedSearchOmpSetter setter(1);
+                    for (int64_t j = 0; j < batch_size; ++j) {
+                        int64_t idx = i * batch_size + j;
+                        // 1 thread per element
+                        ThreadPool::ScopedSearchOmpSetter setter(1);
 
-                    // set up a query
-                    const float* cur_query = nullptr;
+                        // set up a query
+                        const float* cur_query = nullptr;
 
-                    std::vector<float> cur_query_tmp(dim);
-                    if (data_format == DataFormatEnum::fp32) {
-                        cur_query = (const float*)data + idx * dim;
-                    } else {
-                        convert_rows_to_fp32(data, cur_query_tmp.data(), data_format, idx, 1, dim);
-                        cur_query = cur_query_tmp.data();
-                    }
+                        std::vector<float> cur_query_tmp(dim);
+                        if (data_format == DataFormatEnum::fp32) {
+                            cur_query = (const float*)data + idx * dim;
+                        } else {
+                            convert_rows_to_fp32(data, cur_query_tmp.data(), data_format, idx, 1, dim);
+                            cur_query = cur_query_tmp.data();
+                        }
 
-                    // set up local results
-                    faiss::idx_t* const __restrict local_ids = ids.get() + k * idx;
-                    float* const __restrict local_distances = distances.get() + k * idx;
+                        // set up local results
+                        faiss::idx_t* const __restrict local_ids = ids.get() + k * idx;
+                        float* const __restrict local_distances = distances.get() + k * idx;
 
-                    // check if we need to perform a brute-force search bcz of the lack of results
-                    auto bf_search_needed = [&]() -> bool {
-                        size_t real_topk = 0;
-                        for (auto j = 0; j < k; ++j) {
-                            if (local_ids[j] < 0) {
-                                continue;
+                        // check if we need to perform a brute-force search bcz of the lack of results
+                        auto bf_search_needed = [&]() -> bool {
+                            size_t real_topk = 0;
+                            for (auto j = 0; j < k; ++j) {
+                                if (local_ids[j] < 0) {
+                                    continue;
+                                }
+                                real_topk++;
                             }
-                            real_topk++;
-                        }
-                        if (real_topk < k && real_topk < bitset.size() - bitset.count() &&
-                            bf_index_wrapper_ptr != nullptr) {
-                            return true;
-                        }
-                        return false;
-                    };
+                            if (real_topk < k && real_topk < bitset.size() - bitset.count() &&
+                                bf_index_wrapper_ptr != nullptr) {
+                                return true;
+                            }
+                            return false;
+                        };
 
-                    // perform the search
-                    if (is_refined) {
-                        faiss::IndexRefineSearchParameters refine_params;
-                        refine_params.k_factor = hnsw_cfg.refine_k.value_or(1);
-                        // a refine procedure itself does not need to care about filtering
-                        refine_params.sel = nullptr;
-                        refine_params.base_index_params = &hnsw_search_params;
+                        // perform the search
+                        if (is_refined) {
+                            faiss::IndexRefineSearchParameters refine_params;
+                            refine_params.k_factor = hnsw_cfg.refine_k.value_or(1);
+                            // a refine procedure itself does not need to care about filtering
+                            refine_params.sel = nullptr;
+                            refine_params.base_index_params = &hnsw_search_params;
 
-                        index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids, &refine_params);
-                        if (bf_search_needed()) {
-                            bf_index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids, &refine_params);
+                            index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids, &refine_params);
+                            if (bf_search_needed()) {
+                                bf_index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids,
+                                                             &refine_params);
+                            }
+                        } else {
+                            index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids, &hnsw_search_params);
+                            if (bf_search_needed()) {
+                                bf_index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids,
+                                                             &hnsw_search_params);
+                            }
                         }
-                    } else {
-                        index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids, &hnsw_search_params);
-                        if (bf_search_needed()) {
-                            bf_index_wrapper_ptr->search(1, cur_query, k, local_distances, local_ids,
-                                                         &hnsw_search_params);
-                        }
-                    }
 
-                    if (!labels.empty()) {
-                        for (auto j = 0; j < k; ++j) {
-                            local_ids[j] = local_ids[j] < 0 ? local_ids[j] : labels[index_id]->operator[](local_ids[j]);
+                        if (!labels.empty()) {
+                            for (auto j = 0; j < k; ++j) {
+                                local_ids[j] =
+                                    local_ids[j] < 0 ? local_ids[j] : labels[index_id]->operator[](local_ids[j]);
+                            }
                         }
                     }
                 }));
