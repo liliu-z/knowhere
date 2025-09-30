@@ -1256,8 +1256,6 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
             std::vector<folly::Future<folly::Unit>> futs;
             futs.reserve(batch_num);
 
-            LOG_KNOWHERE_ERROR_ << "liliutest now I have concurrency " << concurrency << " and batch_size "
-                                << batch_size << " and batch_num " << batch_num;
             // size_t holder_num = search_pool->get_search_pool_holder();
             // size_t thread_num = search_pool->size();
             // size_t batch_size = std::max(1, rows * holder_num / thread_num);
@@ -1267,8 +1265,9 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
                 futs.emplace_back(search_pool->push([&, idi = i, is_refined = is_refined,
                                                      index_wrapper_ptr = index_wrapper_ptr,
                                                      bf_index_wrapper_ptr = bf_index_wrapper_ptr]() {
-                    for (int64_t j = 0; j < batch_size; ++j) {
-                        int64_t idx = i * batch_size + j;
+                    int64_t start_idx = idi * batch_size;
+                    int64_t end_idx = std::min(start_idx + batch_size, rows);
+                    for (int64_t idx = start_idx; idx < end_idx; ++idx) {
                         // 1 thread per element
                         ThreadPool::ScopedSearchOmpSetter setter(1);
 
@@ -1330,10 +1329,7 @@ class BaseFaissRegularIndexHNSWNode : public BaseFaissRegularIndexNode {
                                     local_ids[j] < 0 ? local_ids[j] : labels[index_id]->operator[](local_ids[j]);
                             }
                         }
-                        LOG_KNOWHERE_ERROR_ << "liliutest now I have finished item " << idx << " for batch " << idi;
                     }
-                    LOG_KNOWHERE_ERROR_ << "liliutest now I have finished batch " << idi << " and batch_size "
-                                        << batch_size;
                 }));
             }
 
