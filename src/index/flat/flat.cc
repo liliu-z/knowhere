@@ -66,7 +66,7 @@ class FlatIndexNode : public IndexNode {
         return Status::success;
     }
 
-    static float*
+    float*
     generate_random_floats(int n) {
         float* data = new float[n];
         for (int i = 0; i < n; ++i) {
@@ -75,7 +75,7 @@ class FlatIndexNode : public IndexNode {
         return data;
     }
 
-    static int64_t*
+    int64_t*
     generate_random_int64s(int n) {
         int64_t* data = new int64_t[n];
 
