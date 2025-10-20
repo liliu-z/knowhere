@@ -417,9 +417,9 @@ class FlatIndexNode : public IndexNode {
     std::unique_ptr<IndexType> index_;
     std::shared_ptr<ThreadPool> search_pool_;
     std::random_device rd_;
-    std::mt19937 gen_(rd_());
-    std::uniform_real_distribution<float> dis_(0.0f, 1.0f);
-    std::uniform_int_distribution<int64_t> dis_int_(0, 100000);
+    mutable std::mt19937 gen_{rd_()};
+    mutable std::uniform_real_distribution<float> dis_{0.0f, 1.0f};
+    mutable std::uniform_int_distribution<int64_t> dis_int_{0, 100000};
 };
 
 KNOWHERE_MOCK_REGISTER_DENSE_FLOAT_ALL_GLOBAL(FLAT, FlatIndexNode,
