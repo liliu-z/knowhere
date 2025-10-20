@@ -66,6 +66,25 @@ class FlatIndexNode : public IndexNode {
         return Status::success;
     }
 
+    static float*
+    generate_random_floats(int n) {
+        float* data = new float[n];
+        for (int i = 0; i < n; ++i) {
+            data[i] = dis_(gen_);
+        }
+        return data;
+    }
+
+    static int64_t*
+    generate_random_int64s(int n) {
+        int64_t* data = new int64_t[n];
+
+        for (int i = 0; i < n; ++i) {
+            data[i] = dis_int_(gen_);
+        }
+        return data;
+    }
+
     expected<DataSetPtr>
     Search(const DataSetPtr dataset, std::unique_ptr<Config> cfg, const BitsetView& bitset) const override {
         if (!index_) {
@@ -79,65 +98,66 @@ class FlatIndexNode : public IndexNode {
 
         auto k = f_cfg.k.value();
         auto nq = dataset->GetRows();
-        auto x = dataset->GetTensor();
-        auto dim = dataset->GetDim();
+        return GenResultDataSet(nq, k, generate_random_int64s(nq * k), generate_random_floats(nq * k));
+        // auto x = dataset->GetTensor();
+        // auto dim = dataset->GetDim();
 
-        auto len = k * nq;
-        int64_t* ids = nullptr;
-        float* distances = nullptr;
-        try {
-            ids = new (std::nothrow) int64_t[len];
-            distances = new (std::nothrow) float[len];
-            std::vector<folly::Future<folly::Unit>> futs;
-            futs.reserve(nq);
-            for (int i = 0; i < nq; ++i) {
-                futs.emplace_back(search_pool_->push([&, index = i] {
-                    ThreadPool::ScopedSearchOmpSetter setter(1);
-                    auto cur_ids = ids + k * index;
-                    auto cur_dis = distances + k * index;
+        // auto len = k * nq;
+        // int64_t* ids = nullptr;
+        // float* distances = nullptr;
+        // try {
+        //     ids = new (std::nothrow) int64_t[len];
+        //     distances = new (std::nothrow) float[len];
+        //     std::vector<folly::Future<folly::Unit>> futs;
+        //     futs.reserve(nq);
+        //     for (int i = 0; i < nq; ++i) {
+        //         futs.emplace_back(search_pool_->push([&, index = i] {
+        //             ThreadPool::ScopedSearchOmpSetter setter(1);
+        //             auto cur_ids = ids + k * index;
+        //             auto cur_dis = distances + k * index;
 
-                    BitsetViewIDSelector bw_idselector(bitset);
-                    faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
+        //             BitsetViewIDSelector bw_idselector(bitset);
+        //             faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
 
-                    if constexpr (std::is_same<IndexType, faiss::IndexFlat>::value) {
-                        auto cur_query = (const DataType*)x + dim * index;
-                        std::unique_ptr<DataType[]> copied_query = nullptr;
-                        if (is_cosine) {
-                            copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
-                            cur_query = copied_query.get();
-                        }
+        //             if constexpr (std::is_same<IndexType, faiss::IndexFlat>::value) {
+        //                 auto cur_query = (const DataType*)x + dim * index;
+        //                 std::unique_ptr<DataType[]> copied_query = nullptr;
+        //                 if (is_cosine) {
+        //                     copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
+        //                     cur_query = copied_query.get();
+        //                 }
 
-                        faiss::SearchParameters search_params;
-                        search_params.sel = id_selector;
+        //                 faiss::SearchParameters search_params;
+        //                 search_params.sel = id_selector;
 
-                        index_->search(1, cur_query, k, cur_dis, cur_ids, &search_params);
-                    }
-                    if constexpr (std::is_same<IndexType, faiss::IndexBinaryFlat>::value) {
-                        auto cur_i_dis = reinterpret_cast<int32_t*>(cur_dis);
+        //                 index_->search(1, cur_query, k, cur_dis, cur_ids, &search_params);
+        //             }
+        //             if constexpr (std::is_same<IndexType, faiss::IndexBinaryFlat>::value) {
+        //                 auto cur_i_dis = reinterpret_cast<int32_t*>(cur_dis);
 
-                        faiss::SearchParameters search_params;
-                        search_params.sel = id_selector;
+        //                 faiss::SearchParameters search_params;
+        //                 search_params.sel = id_selector;
 
-                        index_->search(1, (const uint8_t*)x + index * ((dim + 7) / 8), k, cur_i_dis, cur_ids,
-                                       &search_params);
+        //                 index_->search(1, (const uint8_t*)x + index * ((dim + 7) / 8), k, cur_i_dis, cur_ids,
+        //                                &search_params);
 
-                        if (index_->metric_type == faiss::METRIC_Hamming) {
-                            for (int64_t j = 0; j < k; j++) {
-                                cur_dis[j] = static_cast<float>(cur_i_dis[j]);
-                            }
-                        }
-                    }
-                }));
-            }
-            // wait for the completion
-            WaitAllSuccess(futs);
-        } catch (const std::exception& e) {
-            std::unique_ptr<int64_t[]> auto_delete_ids(ids);
-            std::unique_ptr<float[]> auto_delete_dis(distances);
-            LOG_KNOWHERE_WARNING_ << "error inner faiss: " << e.what();
-            return expected<DataSetPtr>::Err(Status::faiss_inner_error, e.what());
-        }
-        return GenResultDataSet(nq, k, ids, distances);
+        //                 if (index_->metric_type == faiss::METRIC_Hamming) {
+        //                     for (int64_t j = 0; j < k; j++) {
+        //                         cur_dis[j] = static_cast<float>(cur_i_dis[j]);
+        //                     }
+        //                 }
+        //             }
+        //         }));
+        //     }
+        //     // wait for the completion
+        //     WaitAllSuccess(futs);
+        // } catch (const std::exception& e) {
+        //     std::unique_ptr<int64_t[]> auto_delete_ids(ids);
+        //     std::unique_ptr<float[]> auto_delete_dis(distances);
+        //     LOG_KNOWHERE_WARNING_ << "error inner faiss: " << e.what();
+        //     return expected<DataSetPtr>::Err(Status::faiss_inner_error, e.what());
+        // }
+        // return GenResultDataSet(nq, k, ids, distances);
     }
 
     expected<DataSetPtr>
@@ -393,6 +413,10 @@ class FlatIndexNode : public IndexNode {
  private:
     std::unique_ptr<IndexType> index_;
     std::shared_ptr<ThreadPool> search_pool_;
+    std::random_device rd_;
+    std::mt19937 gen_(rd_());
+    std::uniform_real_distribution<float> dis_(0.0f, 1.0f);
+    std::uniform_int_distribution<int64_t> dis_int_(0, 100000);
 };
 
 KNOWHERE_MOCK_REGISTER_DENSE_FLOAT_ALL_GLOBAL(FLAT, FlatIndexNode,
