@@ -9,6 +9,8 @@
 // is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 // or implied. See the License for the specific language governing permissions and limitations under the License.
 
+#include <random>
+
 #include "common/metric.h"
 #include "faiss/IndexBinaryFlat.h"
 #include "faiss/IndexFlat.h"
@@ -67,7 +69,7 @@ class FlatIndexNode : public IndexNode {
     }
 
     float*
-    generate_random_floats(int n) {
+    GenerateRandomFloats(int n) const {
         float* data = new float[n];
         for (int i = 0; i < n; ++i) {
             data[i] = dis_(gen_);
@@ -76,7 +78,7 @@ class FlatIndexNode : public IndexNode {
     }
 
     int64_t*
-    generate_random_int64s(int n) {
+    GenerateRandomInt64s(int n) const {
         int64_t* data = new int64_t[n];
 
         for (int i = 0; i < n; ++i) {
@@ -92,13 +94,13 @@ class FlatIndexNode : public IndexNode {
             return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
         }
 
-        DataSetPtr results = std::make_shared<DataSet>();
+        // DataSetPtr results = std::make_shared<DataSet>();
         const FlatConfig& f_cfg = static_cast<const FlatConfig&>(*cfg);
         bool is_cosine = IsMetricType(f_cfg.metric_type.value(), knowhere::metric::COSINE);
 
         auto k = f_cfg.k.value();
         auto nq = dataset->GetRows();
-        return GenResultDataSet(nq, k, generate_random_int64s(nq * k), generate_random_floats(nq * k));
+        return GenResultDataSet(nq, k, GenerateRandomInt64s(nq * k), GenerateRandomFloats(nq * k));
         // auto x = dataset->GetTensor();
         // auto dim = dataset->GetDim();
 
@@ -352,6 +354,7 @@ class FlatIndexNode : public IndexNode {
             faiss::IndexBinary* index = faiss::read_index_binary(&reader);
             index_.reset(static_cast<IndexType*>(index));
         }
+        dis_int_ = std::uniform_int_distribution<int64_t>(0, this->Count());
         return Status::success;
     }
 
